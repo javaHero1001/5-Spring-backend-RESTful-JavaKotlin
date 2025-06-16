@@ -1,65 +1,146 @@
 package ru.javabegin.backend.todo.controllers;
 
+/*
+
+Чтобы дать меньше шансов для взлома (например, CSRF атак): POST/PUT запросы могут изменять/фильтровать закрытые данные, а GET запросы - для получения незащищенных данных
+Т.е. GET-запросы не должны использоваться для изменения/получения секретных данных
+
+Если возникнет exception - вернется код  500 Internal Server Error, поэтому не нужно все действия оборачивать в try-catch
+
+Используем @RestController вместо обычного @Controller, чтобы все ответы сразу оборачивались в JSON,
+иначе пришлось бы добавлять лишние объекты в код, использовать @ResponseBody для ответа, указывать тип отправки JSON
+
+Названия методов могут быть любыми, главное не дублировать их имена и URL mapping
+
+*/
+
+
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.javabegin.backend.todo.entity.Priority;
-import ru.javabegin.backend.todo.entity.User;
+import ru.javabegin.backend.todo.search.PrioritySearchValues;
 import ru.javabegin.backend.todo.service.PriorityService;
-import ru.javabegin.backend.todo.service.UserService;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 
 @RestController
-@RequestMapping("/priority")
-public class PriorityController {
-    private PriorityService priorityService;
-    private UserService userService;
+@RequestMapping("/priority") // базовый URI
 
-    public PriorityController(PriorityService priorityService, UserService userService){
+public class PriorityController {
+
+    private PriorityService priorityService;
+
+    public PriorityController(PriorityService priorityService) {
         this.priorityService = priorityService;
-        this.userService = new UserService();
     }
 
     @PostMapping("/all")
-    public List<Priority> findAll(@RequestBody String title){
-        return priorityService.findAll(title);
+    public List<Priority> findAll(@RequestBody String email) {
+        return priorityService.findAll(email);
     }
 
+
     @PostMapping("/add")
-    public ResponseEntity<Priority> add(@RequestBody Priority priority){
-        if(priority.getId() != null && priority.getId() != 0)
+    public ResponseEntity<Priority> add(@RequestBody Priority priority) {
+
+        if (priority.getId() != null && priority.getId() != 0) {
+            // id создается автоматически в БД (autoincrement), поэтому его передавать не нужно, иначе может быть конфликт уникальности значения
             return new ResponseEntity("redundant param: id MUST be null", HttpStatus.NOT_ACCEPTABLE);
-        if(priority.getTitle() == null || priority.getTitle().trim().length() == 0)
-            return new ResponseEntity("missing param: title", HttpStatus.NOT_ACCEPTABLE);
+        }
+
+        // если передали пустое значение title
+        if (priority.getTitle() == null || priority.getTitle().trim().length() == 0) {
+            return new ResponseEntity("missed param: title", HttpStatus.NOT_ACCEPTABLE);
+        }
+
+        // если передали пустое значение color
+        if (priority.getColor() == null || priority.getColor().trim().length() == 0) {
+            return new ResponseEntity("missed param: color", HttpStatus.NOT_ACCEPTABLE);
+        }
+
+        // save работает как на добавление, так и на обновление
         return ResponseEntity.ok(priorityService.add(priority));
     }
 
+
     @PutMapping("/update")
-    public ResponseEntity<?> update(@RequestBody Priority priority, @RequestHeader("user_id") Long userId) {
+    public ResponseEntity update(@RequestBody Priority priority) {
 
-        // Проверка обязательных полей Priority
+
+        // проверка на обязательные параметры
         if (priority.getId() == null || priority.getId() == 0) {
-            return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body("missing param: id");
-        }
-        if (priority.getTitle() == null || priority.getTitle().trim().isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body("missing param: title");
+            return new ResponseEntity("missed param: id", HttpStatus.NOT_ACCEPTABLE);
         }
 
-        // Проверка существования пользователя
-        User user = userService.search(userId);
-        if (user == null) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("user not found");
+        // если передали пустое значение title
+        if (priority.getTitle() == null || priority.getTitle().trim().length() == 0) {
+            return new ResponseEntity("missed param: title", HttpStatus.NOT_ACCEPTABLE);
         }
 
-        // Проверка, принадлежит ли Priority этому пользователю
-        Priority existingPriority = priorityService.findById(priority.getId());
-        if (existingPriority == null || !existingPriority.getUser().getId().equals(userId)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("priority doesn't belong to user");
+        // если передали пустое значение color
+        if (priority.getColor() == null || priority.getColor().trim().length() == 0) {
+            return new ResponseEntity("missed param: color", HttpStatus.NOT_ACCEPTABLE);
         }
 
-        // Обновление Priority
-        priority.setUser(user); // Устанавливаем связь
-        return ResponseEntity.ok(priorityService.update(priority));
+        // save работает как на добавление, так и на обновление
+        priorityService.update(priority);
+
+
+        return new ResponseEntity(HttpStatus.OK); // просто отправляем статус 200 (операция прошла успешно)
+
     }
+
+    // параметр id передаются не в BODY запроса, а в самом URL
+    @PostMapping("/id")
+    public ResponseEntity<Priority> findById(@RequestBody Long id) {
+
+        Priority priority = null;
+
+        // можно обойтись и без try-catch, тогда будет возвращаться полная ошибка (stacktrace)
+        // здесь показан пример, как можно обрабатывать исключение и отправлять свой текст/статус
+        try {
+            priority = priorityService.findById(id);
+        } catch (NoSuchElementException e) { // если объект не будет найден
+            e.printStackTrace();
+            return new ResponseEntity("id=" + id + " not found", HttpStatus.NOT_ACCEPTABLE);
+        }
+
+        return ResponseEntity.ok(priority);
+    }
+
+
+    // для удаления используем типа запроса put, а не delete, т.к. он позволяет передавать значение в body, а не в адресной строке
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity delete(@PathVariable("id") Long id) {
+
+        // можно обойтись и без try-catch, тогда будет возвращаться полная ошибка (stacktrace)
+        // здесь показан пример, как можно обрабатывать исключение и отправлять свой текст/статус
+        try {
+            priorityService.deleteById(id);
+        } catch (EmptyResultDataAccessException e) {
+            e.printStackTrace();
+            return new ResponseEntity("id=" + id + " not found", HttpStatus.NOT_ACCEPTABLE);
+        }
+
+        return new ResponseEntity(HttpStatus.OK); // просто отправляем статус 200 (операция прошла успешно)
+    }
+
+
+    // поиск по любым параметрам PrioritySearchValues
+    @PostMapping("/search")
+    public ResponseEntity<List<Priority>> search(@RequestBody PrioritySearchValues prioritySearchValues) {
+
+        // проверка на обязательные параметры
+        if (prioritySearchValues.getEmail() == null || prioritySearchValues.getEmail().trim().length() == 0) {
+            return new ResponseEntity("missed param: email", HttpStatus.NOT_ACCEPTABLE);
+        }
+
+        // если вместо текста будет пусто или null - вернутся все категории
+        return ResponseEntity.ok(priorityService.find(prioritySearchValues.getTitle(), prioritySearchValues.getEmail()));
+    }
+
+
 }

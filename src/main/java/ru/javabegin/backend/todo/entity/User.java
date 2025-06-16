@@ -1,11 +1,6 @@
 package ru.javabegin.backend.todo.entity;
-
-
-
 /*
-
 пользователь - основной объект, с которым связаны все остальные (через внешние ключи)
-
  */
 
 import jakarta.persistence.*;
