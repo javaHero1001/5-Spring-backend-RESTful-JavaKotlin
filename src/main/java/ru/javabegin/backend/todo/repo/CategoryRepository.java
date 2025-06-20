@@ -13,8 +13,9 @@ import java.util.List;
 // принцип ООП: абстракция-реализация - здесь описываем все доступные способы доступа к данным
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, Long> {
-    // поиск по email(как пользоваться ?)
-    List<Category>findByUserEmailOrderByTitleAsc(String email);
+
+    // поиск категорий пользователя (по названию)
+    List<Category> findByUserEmailOrderByTitleAsc(String email);
 
     // поиск значений по названию для конкретного пользователя
     @Query("SELECT c FROM Category c where " +

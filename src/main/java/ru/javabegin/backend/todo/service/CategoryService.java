@@ -1,12 +1,13 @@
 package ru.javabegin.backend.todo.service;
 
-
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.javabegin.backend.todo.entity.Category;
 import ru.javabegin.backend.todo.repo.CategoryRepository;
 
 import java.util.List;
+
 
 // всегда нужно создавать отдельный класс Service для доступа к данным, даже если кажется,
 // что мало методов или это все можно реализовать сразу в контроллере
@@ -25,22 +26,32 @@ public class CategoryService {
         this.repository = repository;
     }
 
+    @Cacheable(cacheNames = "categories")
     public List<Category> findAll(String email) {
         return repository.findByUserEmailOrderByTitleAsc(email);
     }
 
     public Category add(Category category) {
-        return repository.save(category);
+        return repository.save(category); // метод save обновляет или создает новый объект, если его не было
     }
 
     public Category update(Category category) {
-        return repository.save(category);
+        return repository.save(category); // метод save обновляет или создает новый объект, если его не было
     }
 
     public void deleteById(Long id) {
         repository.deleteById(id);
     }
-    public List<Category> search(String title, String email) {
-            return repository.findByTitle(title, email);
+
+    // поиск категорий пользователя по названию
+    public List<Category> findByTitle(String text, String email) {
+        return repository.findByTitle(text, email);
     }
+
+    // поиск категории по ID
+    public Category findById(Long id) {
+        return repository.findById(id).get(); // т.к. возвращается Optional - можно получить объект методом get()
+    }
+
+
 }

@@ -1,4 +1,4 @@
-package ru.javabegin.backend.todo.controllers;
+package ru.javabegin.backend.todo.controller;
 
 /*
 
@@ -28,14 +28,17 @@ import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/priority") // базовый URI
-
 public class PriorityController {
 
+    // доступ к данным из БД
     private PriorityService priorityService;
 
+    // используем автоматическое внедрение экземпляра класса через конструктор
+    // не используем @Autowired ля переменной класса, т.к. "Field injection is not recommended "
     public PriorityController(PriorityService priorityService) {
         this.priorityService = priorityService;
     }
+
 
     @PostMapping("/all")
     public List<Priority> findAll(@RequestBody String email) {
@@ -46,6 +49,7 @@ public class PriorityController {
     @PostMapping("/add")
     public ResponseEntity<Priority> add(@RequestBody Priority priority) {
 
+        // проверка на обязательные параметры
         if (priority.getId() != null && priority.getId() != 0) {
             // id создается автоматически в БД (autoincrement), поэтому его передавать не нужно, иначе может быть конфликт уникальности значения
             return new ResponseEntity("redundant param: id MUST be null", HttpStatus.NOT_ACCEPTABLE);

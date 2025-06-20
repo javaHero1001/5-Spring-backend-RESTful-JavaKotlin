@@ -1,16 +1,18 @@
 package ru.javabegin.backend.todo.search;
 
-
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-@Getter
-@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Getter
+@Setter
+// возможные значения, по которым можно искать категории
 public class CategorySearchValues {
-    private String title;
-    private String email;
+
+    private String title; // такое же название должно быть у объекта на frontend - необязательно заполнять
+    private String email; // для фильтрации значений конкретного пользователя - обязательно нужно заполнять
+
 }
